@@ -13,12 +13,20 @@ import torch
 import numpy as np
 from torchvision.utils import save_image
 import torch.nn as nn
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 np.random.seed(0)  # random seed
 
 if __name__ == '__main__':
 	file_dir = "/home1/yixu/yixu_project/CVAE-GAN/download_script/download"
+
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	cuda = True if torch.cuda.is_available() else False
+	Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+
 	data = read_img.get_file(file_dir)
+	data = data.to(device)
 	# dataset = torch.from_numpy(data)
 	dataloader = DataLoader(data, batch_size=64, shuffle=True)
 	# for batch_idx, data in enumerate(dataloader):
@@ -58,7 +66,7 @@ if __name__ == '__main__':
 						  nn.Sigmoid(),
 						  )
 
-	# print(G_net)
+	print(G_net)
 
 	n_d_feature = 128
 
@@ -80,6 +88,12 @@ if __name__ == '__main__':
 						  nn.Conv2d(1 * n_d_feature, 1, kernel_size=4),
 						  )
 
+	criterion = nn.BCEWithLogitsLoss() # ???/how to deal with it
+
+	if cuda:
+		G_net.cuda()
+		D_net.cuda()
+		criterion.cuda()
 
 	def weights_init(m):
 		if type(m) in [nn.ConvTranspose2d, nn.Conv2d]:
@@ -88,24 +102,17 @@ if __name__ == '__main__':
 			nn.init.normal(m.weight, 1.0, 0.02)
 			nn.init.constant_(m.bias, 0)
 
-	criterion = nn.BCEWithLogitsLoss()
 
-	# cuda = True if torch.cuda.is_available() else False
-	# if cuda:
-	# 	G_net.cuda()
-	# 	D_net.cuda()
-	# 	criterion.cuda()
-	# print(D_net)
+	print(D_net)
 
 	G_net.apply(weights_init)
 	D_net.apply(weights_init)
-	# ???/how to deal with it
 
 	G_optimizer = torch.optim.Adam(G_net.parameters(), lr=0.0002, betas=(0.5, 0.999))  # ???
 	D_optimizer = torch.optim.Adam(D_net.parameters(), lr=0.0002, betas=(0.5, 0.999))
 
 	batch_size = 64
-	fix_noises = torch.randn(batch_size, latent_size, 1, 1)
+	fix_noises = torch.randn(batch_size, latent_size, 1, 1).cuda()
 
 	epoch_num = 10
 	for epoch in range(epoch_num):
@@ -113,47 +120,48 @@ if __name__ == '__main__':
 			# get data
 			real_img = data
 			batch_size = real_img.size(0)
-			noises = torch.randn(batch_size, latent_size, 1, 1)
-			fake_image = G_net(noises)
+			# train D
+			labels_real = torch.ones(batch_size).cuda()
+			preds = D_net(real_img)
+			outputs = preds.reshape(-1)  # ???
+			d_loss_real = criterion(outputs, labels_real)
+			d_mean_real = outputs.sigmoid().mean()
 
-			#train G
-			labels_gen = torch.ones(batch_size)
-			preds_gen = D_net(fake_image)
+			noises = torch.randn(batch_size, latent_size, 1, 1).cuda()
+
+			fake_image = G_net(noises).cuda()
+			labels_fake = torch.zeros(batch_size).cuda()
+
+			# no_use = fake_image.detach()
+			preds_fake = D_net(fake_image).cuda()
+
+			outputs_fake = preds_fake.view(-1)#???
+			d_loss_fake = criterion(outputs_fake, labels_fake)
+			d_mean_fake = outputs_fake.sigmoid().mean()
+
+			d_loss = d_loss_fake + d_loss_real
+			D_net.zero_grad()
+			d_loss.backward(retain_graph=True) # it will have a line, but it works
+			D_optimizer.step()
+
+			labels_gen = torch.ones(batch_size).cuda()
+
+			preds_gen = D_net(fake_image).cuda()
 			outputs_gen = preds_gen.view(-1)
 			g_loss = criterion(outputs_gen, labels_gen)# problem
+
 			g_mean_fake = outputs_gen.sigmoid().mean()
 
 			G_net.zero_grad()
 			g_loss.backward()
 			G_optimizer.step()
 
-			# train D
-			labels_real = torch.ones(batch_size)
-			preds = D_net(real_img)
-			outputs = preds.reshape(-1)  # ???
-			d_loss_real = criterion(outputs, labels_real)
-			d_mean_real = outputs.sigmoid().mean()
-
-			labels_fake = torch.zeros(batch_size)
-			# no_use = fake_image.detach()
-			preds_fake = D_net(fake_image)
-
-			outputs_fake = preds_fake.view(-1)  # ???
-			d_loss_fake = criterion(outputs_fake, labels_fake)
-			d_mean_fake = outputs_fake.sigmoid().mean()
-
-			d_loss = d_loss_fake + d_loss_real
-			G_net.zero_grad()
-			D_net.zero_grad()
-			d_loss.backward()
-			D_optimizer.step()
-
 			print('[{}/{}]'.format(epoch,epoch_num) +
 				  '[{}/{}]'.format(batch_idx,len(dataloader)) +
 				  'D_loss:{:g} g_loss:{:g} '.format(d_loss,g_loss) +
 				  'real_img find:{:} fake_img find,fake for real: {:g} ,real for fake:{:g}'.format(d_mean_real, d_mean_fake, g_mean_fake))
 			if batch_idx == 1:
-				fake_img = G_net(fix_noises)
+				fake_img = G_net(fix_noises).cuda()
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
 				save_image(fake_img, path, normalize=True)
 
