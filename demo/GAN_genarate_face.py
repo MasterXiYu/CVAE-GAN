@@ -12,20 +12,148 @@ from torch.utils.data import DataLoader
 import torch
 import numpy as np
 from torchvision.utils import save_image
+import torch.nn as nn
 
 np.random.seed(0)  # random seed
 
 if __name__ == '__main__':
 	file_dir = "/home1/yixu/yixu_project/CVAE-GAN/download_script/download"
 	data = read_img.get_file(file_dir)
-	dataset = torch.from_numpy(data)
-	dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
-	for batch_idx, data in enumerate(dataloader):
-		real_images = data
-		batch_size = real_images.size(0)
-		print('#{} has {} images'.format(batch_idx, batch_size))
-		if batch_idx == 90:
-			path = '/home1/yixu/yixu_project/CVAE-GAN/output/save{:03d}.jpg'.format(batch_idx)
-			save_image(real_images, path, normalize=True)
+	# dataset = torch.from_numpy(data)
+	dataloader = DataLoader(data, batch_size=64, shuffle=True)
+	# for batch_idx, data in enumerate(dataloader):
+	# 	real_images = data
+	# 	batch_size = real_images.size(0)
+	# print('#{} has {} images'.format(batch_idx, batch_size))
+	# if batch_idx == 1:
+	# 	path = '/home1/yixu/yixu_project/CVAE-GAN/output/save{:03d}.jpg'.format(batch_idx)
+	# 	save_image(real_images, path, normalize=True)
 
-	print(dataloader)
+	# print(dataloader)
+	latent_size = 64
+	n_channel = 3
+	n_g_feature = 128
+
+	# ConvTranspose2d(in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0,groups=1, bias=True, dilation=1) **
+	# output=(input-1)*stride+output_padding -2*padding+kernel_size
+
+	G_net = nn.Sequential(nn.ConvTranspose2d(latent_size, 4 * n_g_feature, kernel_size=4, bias=False),
+						  nn.BatchNorm2d(4 * n_g_feature),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(4 * n_g_feature, 2 * n_g_feature, kernel_size=4, padding=1, stride=2,
+											 bias=False),
+						  nn.BatchNorm2d(2 * n_g_feature),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(2 * n_g_feature, n_g_feature, kernel_size=4, stride=2, padding=1,
+											 bias=False),
+						  nn.BatchNorm2d(n_g_feature),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(n_g_feature, n_g_feature//2, kernel_size=4, stride=2, padding=1),
+						  nn.BatchNorm2d(n_g_feature//2),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(n_g_feature//2, n_g_feature//4, kernel_size=4, stride=2, padding=1),
+						  nn.BatchNorm2d(n_g_feature//4),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(n_g_feature//4, n_channel, kernel_size=4, stride=2, padding=1),
+						  nn.Sigmoid(),
+						  )
+
+	# print(G_net)
+
+	n_d_feature = 128
+
+	D_net = nn.Sequential(nn.Conv2d(n_channel, n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
+						  nn.BatchNorm2d(n_d_feature),
+						  nn.ReLU(),
+						  nn.Conv2d(n_d_feature, 2 * n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
+						  nn.BatchNorm2d(2 * n_d_feature),
+						  nn.ReLU(),
+						  nn.Conv2d(2 * n_d_feature, 4 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
+						  nn.BatchNorm2d(4 * n_d_feature),
+						  nn.ReLU(),
+						  nn.Conv2d(4 * n_d_feature, 2 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
+						  nn.BatchNorm2d(2 * n_d_feature),
+						  nn.ReLU(),
+						  nn.Conv2d(2 * n_d_feature, 1 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
+						  nn.BatchNorm2d(1 * n_d_feature),
+						  nn.ReLU(),
+						  nn.Conv2d(1 * n_d_feature, 1, kernel_size=4),
+						  )
+
+
+	def weights_init(m):
+		if type(m) in [nn.ConvTranspose2d, nn.Conv2d]:
+			nn.init.xavier_normal_(m.weight)
+		elif type(m) == nn.BatchNorm2d:
+			nn.init.normal(m.weight, 1.0, 0.02)
+			nn.init.constant_(m.bias, 0)
+
+	criterion = nn.BCEWithLogitsLoss()
+
+	# cuda = True if torch.cuda.is_available() else False
+	# if cuda:
+	# 	G_net.cuda()
+	# 	D_net.cuda()
+	# 	criterion.cuda()
+	# print(D_net)
+
+	G_net.apply(weights_init)
+	D_net.apply(weights_init)
+	# ???/how to deal with it
+
+	G_optimizer = torch.optim.Adam(G_net.parameters(), lr=0.0002, betas=(0.5, 0.999))  # ???
+	D_optimizer = torch.optim.Adam(D_net.parameters(), lr=0.0002, betas=(0.5, 0.999))
+
+	batch_size = 64
+	fix_noises = torch.randn(batch_size, latent_size, 1, 1)
+
+	epoch_num = 10
+	for epoch in range(epoch_num):
+		for batch_idx, data in enumerate(dataloader):
+			# get data
+			real_img = data
+			batch_size = real_img.size(0)
+			noises = torch.randn(batch_size, latent_size, 1, 1)
+			fake_image = G_net(noises)
+
+			#train G
+			labels_gen = torch.ones(batch_size)
+			preds_gen = D_net(fake_image)
+			outputs_gen = preds_gen.view(-1)
+			g_loss = criterion(outputs_gen, labels_gen)# problem
+			g_mean_fake = outputs_gen.sigmoid().mean()
+
+			G_net.zero_grad()
+			g_loss.backward()
+			G_optimizer.step()
+
+			# train D
+			labels_real = torch.ones(batch_size)
+			preds = D_net(real_img)
+			outputs = preds.reshape(-1)  # ???
+			d_loss_real = criterion(outputs, labels_real)
+			d_mean_real = outputs.sigmoid().mean()
+
+			labels_fake = torch.zeros(batch_size)
+			# no_use = fake_image.detach()
+			preds_fake = D_net(fake_image)
+
+			outputs_fake = preds_fake.view(-1)  # ???
+			d_loss_fake = criterion(outputs_fake, labels_fake)
+			d_mean_fake = outputs_fake.sigmoid().mean()
+
+			d_loss = d_loss_fake + d_loss_real
+			G_net.zero_grad()
+			D_net.zero_grad()
+			d_loss.backward()
+			D_optimizer.step()
+
+			print('[{}/{}]'.format(epoch,epoch_num) +
+				  '[{}/{}]'.format(batch_idx,len(dataloader)) +
+				  'D_loss:{:g} g_loss:{:g} '.format(d_loss,g_loss) +
+				  'real_img find:{:} fake_img find,fake for real: {:g} ,real for fake:{:g}'.format(d_mean_real, d_mean_fake, g_mean_fake))
+			if batch_idx == 1:
+				fake_img = G_net(fix_noises)
+				path = '/home1/yixu/yixu_project/CVAE-GAN/output/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
+				save_image(fake_img, path, normalize=True)
+
