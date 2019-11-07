@@ -114,7 +114,7 @@ if __name__ == '__main__':
 	batch_size = 64
 	fix_noises = torch.randn(batch_size, latent_size, 1, 1).cuda()
 
-	epoch_num = 10
+	epoch_num = 4000
 	for epoch in range(epoch_num):
 		for batch_idx, data in enumerate(dataloader):
 			# get data
