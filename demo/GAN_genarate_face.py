@@ -56,13 +56,13 @@ if __name__ == '__main__':
 											 bias=False),
 						  nn.BatchNorm2d(n_g_feature),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature, n_g_feature//2, kernel_size=4, stride=2, padding=1),
+						  nn.ConvTranspose2d(n_g_feature, n_g_feature//2, kernel_size=4, stride=2, padding=1,bias=False),
 						  nn.BatchNorm2d(n_g_feature//2),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature//2, n_g_feature//4, kernel_size=4, stride=2, padding=1),
+						  nn.ConvTranspose2d(n_g_feature//2, n_g_feature//4, kernel_size=4, stride=2, padding=1,bias=False),
 						  nn.BatchNorm2d(n_g_feature//4),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature//4, n_channel, kernel_size=4, stride=2, padding=1),
+						  nn.ConvTranspose2d(n_g_feature//4, n_channel, kernel_size=4, stride=2, padding=1,bias=False),
 						  nn.Sigmoid(),
 						  )
 
