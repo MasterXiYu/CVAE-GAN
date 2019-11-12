@@ -26,42 +26,40 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 class VAE_net(torch.nn.Module):
 	def __init__(self):
 		super(VAE_net, self).__init__()  # jiche fathers Attribute
-
-		n_feature = 128
 		latent_size = 64
 		n_channel = 3
 		n_feature = 128
 		LATENT_CODE_NUM = 64  # for VAE latne
 
 		self.Decoder_net = nn.Sequential(nn.ConvTranspose2d(latent_size, 4 * n_feature, kernel_size=4, bias=False),
-									 nn.BatchNorm2d(4 * n_feature),  # input 64*1*1
-									 nn.LeakyReLU(),
-									 nn.ConvTranspose2d(4 * n_feature, 2 * n_feature, kernel_size=4, padding=1,
-														stride=2,
-														bias=False),
-									 nn.BatchNorm2d(2 * n_feature),
-									 nn.LeakyReLU(),
-									 nn.ConvTranspose2d(2 * n_feature, n_feature, kernel_size=4, padding=1,
-														stride=2,
-														bias=False),
-									 nn.BatchNorm2d(n_feature),
-									 nn.LeakyReLU(),
-									 nn.ConvTranspose2d(n_feature, n_feature // 2, kernel_size=4, stride=2,
-														padding=1),
-									 nn.BatchNorm2d(n_feature // 2),
-									 nn.LeakyReLU(),
-									 nn.ConvTranspose2d(n_feature // 2, n_feature // 4, kernel_size=4, stride=2,
-														padding=1),
-									 nn.BatchNorm2d(n_feature // 4),
-									 nn.LeakyReLU(),
-									 nn.ConvTranspose2d(n_feature // 4, n_channel, kernel_size=4, stride=2,
-														padding=1),
-									 nn.Sigmoid(),  # output 3*128*128
-									 ).cuda()
+										 nn.BatchNorm2d(4 * n_feature),  # input 64*1*1
+										 nn.LeakyReLU(),
+										 nn.ConvTranspose2d(4 * n_feature, 2 * n_feature, kernel_size=4, padding=1,
+															stride=2,
+															bias=False),
+										 nn.BatchNorm2d(2 * n_feature),
+										 nn.LeakyReLU(),
+										 nn.ConvTranspose2d(2 * n_feature, n_feature, kernel_size=4, padding=1,
+															stride=2,
+															bias=False),
+										 nn.BatchNorm2d(n_feature),
+										 nn.LeakyReLU(),
+										 nn.ConvTranspose2d(n_feature, n_feature // 2, kernel_size=4, stride=2,
+															padding=1),
+										 nn.BatchNorm2d(n_feature // 2),
+										 nn.LeakyReLU(),
+										 nn.ConvTranspose2d(n_feature // 2, n_feature // 4, kernel_size=4, stride=2,
+															padding=1),
+										 nn.BatchNorm2d(n_feature // 4),
+										 nn.LeakyReLU(),
+										 nn.ConvTranspose2d(n_feature // 4, n_channel, kernel_size=4, stride=2,
+															padding=1),
+										 nn.Sigmoid(),  # output 3*128*128
+										 ).cuda()
 
 		self.Encoder_cal_u = nn.Linear(64 * 1 * 1, LATENT_CODE_NUM).cuda()
 		self.Encoder_cal_o = nn.Linear(64 * 1 * 1, LATENT_CODE_NUM).cuda()
-		self.Encoder_cal_add_u_o = nn.Linear(LATENT_CODE_NUM, 64 * 1 * 1).cuda()
+		self.Encoder_cal_add_u_o = nn.Linear(LATENT_CODE_NUM, 64 * 1 * 1).cuda() #???
 
 		self.Encoder_net = nn.Sequential(
 			nn.Conv2d(n_channel, n_feature, kernel_size=4, stride=2, padding=1, bias=False),
@@ -90,20 +88,24 @@ class VAE_net(torch.nn.Module):
 		z = mu + eps * torch.exp(logvar / 2)
 		return z.cuda()
 
-	def forward(self, x):
+	def forward(self, img):
 		pred1, pred2 = self.Encoder_net(img), self.Encoder_net(img)
 		mu = self.Encoder_cal_u(pred1.view(pred1.size(0), -1))  # get
 		logvar = self.Encoder_cal_o(pred2.view(pred2.size(0), -1))  # get
 		z = self.reparameterize(mu, logvar)
-		add_u_o = self.Encoder_cal_add_u_o(z).view(z.size(0),64,1,1)
+		add_u_o = self.Encoder_cal_add_u_o(z).view(z.size(0), 64, 1, 1)
 		output = self.Decoder_net(add_u_o)  # get
-		return output.cuda(),mu.cuda(), logvar.cuda()
+		return output.cuda(), mu.cuda(), logvar.cuda()
 
 
 def loss_func(recon_x, x, mu, logvar):
-	BCE = F.binary_cross_entropy(recon_x, x, size_average=False)
+	# BCE = F.binary_cross_entropy(recon_x, x, size_average=False)
+	# KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+	# return BCE + KLD
+	criterion = torch.nn.MSELoss()
+	l2_loss = criterion(recon_x, x)
 	KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-	return BCE + KLD
+	return l2_loss + KLD
 
 
 vae = VAE_net().cuda()
@@ -118,7 +120,6 @@ if __name__ == '__main__':
 	data = data.to(device)
 
 	dataloader = DataLoader(data, batch_size=64, shuffle=True)
-
 
 
 	# for this time decoder is genarate
@@ -138,6 +139,7 @@ if __name__ == '__main__':
 			nn.init.normal(m.weight, 1.0, 0.02)
 			nn.init.constant_(m.bias, 0)
 
+
 	#
 	# vae.Decoder_net.apply(weights_init)
 	# vae.Encoder_net.apply(weights_init)
@@ -145,7 +147,7 @@ if __name__ == '__main__':
 	# vae.Encoder_cal_o.apply(weights_init)
 	# vae.Encoder_cal_u.apply(weights_init)
 
-	fixed_noise = torch.randn(64,64,1,1).cuda()# fix it as one
+	fixed_noise = torch.randn(64, 64, 1, 1).cuda()  # fix it as one
 	epoch_num = 4000
 
 	for epoch in range(epoch_num):
@@ -161,14 +163,13 @@ if __name__ == '__main__':
 			loss.backward()
 			optimizer.step()
 
-
-			if epoch%50==0:
+			if batch_idx == 1:
 				fake_img = vae.Decoder_net(fixed_noise).cuda()
-				path = '/home1/yixu/yixu_project/CVAE-GAN/output_VAE/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,
-																										batch_idx)
+				# path = '/home1/yixu/yixu_project/CVAE-GAN/output_VAE/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
+				path = '/home1/yixu/yixu_project/CVAE-GAN/output_VAE_l2loss/images_epoch{:02d}_batch{:03d}.jpg'.format(
+					epoch, batch_idx)
 				save_image(fake_img, path, normalize=True)
 
-			print('[{}/{}]'.format(epoch,epoch_num)+
-				  '[{}/{}]'.format(batch_idx,len(dataloader))+
+			print('[{}/{}]'.format(epoch, epoch_num) +
+				  '[{}/{}]'.format(batch_idx, len(dataloader)) +
 				  'loss:{:g}'.format(loss))
-
