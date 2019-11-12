@@ -159,7 +159,7 @@ if __name__ == '__main__':
 			print('[{}/{}]'.format(epoch,epoch_num) +
 				  '[{}/{}]'.format(batch_idx,len(dataloader)) +
 				  'D_loss:{:g} g_loss:{:g} '.format(d_loss,g_loss) +
-				  'real_img find:{:} fake_img find,fake for real: {:g} ,real for fake:{:g}'.format(d_mean_real, d_mean_fake, g_mean_fake))
+				  'real_img find:{:g} fake_img find,fake for real: {:g} ,real for fake:{:g}'.format(d_mean_real, d_mean_fake, g_mean_fake))
 			if batch_idx == 1:
 				fake_img = G_net(fix_noises).cuda()
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
