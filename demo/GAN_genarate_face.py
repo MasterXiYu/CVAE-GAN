@@ -14,9 +14,11 @@ import numpy as np
 from torchvision.utils import save_image
 import torch.nn as nn
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,4,5,6,7"
 
 np.random.seed(0)  # random seed
+BATCH_SIZE=9
+latent_size=64
 
 if __name__ == '__main__':
 	file_dir = "/home1/yixu/yixu_project/CVAE-GAN/download_script/download"
@@ -28,7 +30,7 @@ if __name__ == '__main__':
 	data = read_img.get_file(file_dir)
 	data = data.to(device)
 	# dataset = torch.from_numpy(data)
-	dataloader = DataLoader(data, batch_size=64, shuffle=True)
+	dataloader = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
 	# for batch_idx, data in enumerate(dataloader):
 	# 	real_images = data
 	# 	batch_size = real_images.size(0)
@@ -38,31 +40,30 @@ if __name__ == '__main__':
 	# 	save_image(real_images, path, normalize=True)
 
 	# print(dataloader)
-	latent_size = 64
 	n_channel = 3
 	n_g_feature = 128
 
 	# ConvTranspose2d(in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0,groups=1, bias=True, dilation=1) **
 	# output=(input-1)*stride+output_padding -2*padding+kernel_size
 
-	G_net = nn.Sequential(nn.ConvTranspose2d(latent_size, 4 * n_g_feature, kernel_size=4, bias=False),
-						  nn.BatchNorm2d(4 * n_g_feature),
+	G_net = nn.Sequential(nn.ConvTranspose2d(latent_size, 16 * n_g_feature, kernel_size=4, bias=False),
+						  nn.BatchNorm2d(16 * n_g_feature),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(4 * n_g_feature, 2 * n_g_feature, kernel_size=4, padding=1, stride=2,
+						  nn.ConvTranspose2d(16 * n_g_feature, 8 * n_g_feature, kernel_size=4, padding=1, stride=2,
 											 bias=False),
-						  nn.BatchNorm2d(2 * n_g_feature),
+						  nn.BatchNorm2d(8 * n_g_feature),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(2 * n_g_feature, n_g_feature, kernel_size=4, stride=2, padding=1,
+						  nn.ConvTranspose2d(8 * n_g_feature, 4*n_g_feature, kernel_size=4, stride=2, padding=1,
 											 bias=False),
+						  nn.BatchNorm2d(4*n_g_feature),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(4*n_g_feature, 2*n_g_feature, kernel_size=4, stride=2, padding=1,bias=False),
+						  nn.BatchNorm2d(2*n_g_feature),
+						  nn.ReLU(),
+						  nn.ConvTranspose2d(2*n_g_feature, n_g_feature, kernel_size=4, stride=2, padding=1,bias=False),
 						  nn.BatchNorm2d(n_g_feature),
 						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature, n_g_feature//2, kernel_size=4, stride=2, padding=1,bias=False),
-						  nn.BatchNorm2d(n_g_feature//2),
-						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature//2, n_g_feature//4, kernel_size=4, stride=2, padding=1,bias=False),
-						  nn.BatchNorm2d(n_g_feature//4),
-						  nn.ReLU(),
-						  nn.ConvTranspose2d(n_g_feature//4, n_channel, kernel_size=4, stride=2, padding=1,bias=False),
+						  nn.ConvTranspose2d(n_g_feature, n_channel, kernel_size=4, stride=2, padding=1,bias=False),
 						  nn.Sigmoid(),
 						  )
 
@@ -70,13 +71,13 @@ if __name__ == '__main__':
 
 	n_d_feature = 128
 
-	D_net = nn.Sequential(nn.Conv2d(n_channel, n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
-						  nn.BatchNorm2d(n_d_feature),
+	D_net = nn.Sequential(nn.Conv2d(n_channel, 16*n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
+						  nn.BatchNorm2d(16*n_d_feature),
 						  nn.ReLU(),
-						  nn.Conv2d(n_d_feature, 2 * n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
-						  nn.BatchNorm2d(2 * n_d_feature),
+						  nn.Conv2d(16*n_d_feature, 8 * n_d_feature, kernel_size=4, stride=2, padding=1, bias=False),
+						  nn.BatchNorm2d(8 * n_d_feature),
 						  nn.ReLU(),
-						  nn.Conv2d(2 * n_d_feature, 4 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
+						  nn.Conv2d(8 * n_d_feature, 4 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
 						  nn.BatchNorm2d(4 * n_d_feature),
 						  nn.ReLU(),
 						  nn.Conv2d(4 * n_d_feature, 2 * n_d_feature, kernel_size=4, padding=1, stride=2, bias=False),
@@ -110,9 +111,7 @@ if __name__ == '__main__':
 
 	G_optimizer = torch.optim.Adam(G_net.parameters(), lr=0.0002, betas=(0.5, 0.999))  # ???
 	D_optimizer = torch.optim.Adam(D_net.parameters(), lr=0.0002, betas=(0.5, 0.999))
-
-	batch_size = 64
-	fix_noises = torch.randn(batch_size, latent_size, 1, 1).cuda()
+	fix_noises = torch.randn(BATCH_SIZE, latent_size, 1, 1).cuda()
 
 	epoch_num = 4000
 	for epoch in range(epoch_num):
@@ -163,5 +162,4 @@ if __name__ == '__main__':
 			if batch_idx == 1:
 				fake_img = G_net(fix_noises).cuda()
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
-				save_image(fake_img, path, normalize=True)
-
+				save_image(fake_img, path, nrow=3,normalize=True)

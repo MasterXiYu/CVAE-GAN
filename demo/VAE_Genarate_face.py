@@ -141,11 +141,11 @@ if __name__ == '__main__':
 
 
 	#
-	# vae.Decoder_net.apply(weights_init)
-	# vae.Encoder_net.apply(weights_init)
-	# vae.Encoder_cal_add_u_o.apply(weights_init)  # ???
-	# vae.Encoder_cal_o.apply(weights_init)
-	# vae.Encoder_cal_u.apply(weights_init)
+	vae.Decoder_net.apply(weights_init)
+	vae.Encoder_net.apply(weights_init)
+	vae.Encoder_cal_add_u_o.apply(weights_init)  # ???
+	vae.Encoder_cal_o.apply(weights_init)
+	vae.Encoder_cal_u.apply(weights_init)
 
 	fixed_noise = torch.randn(64, 64, 1, 1).cuda()  # fix it as one
 	epoch_num = 4000
