@@ -18,8 +18,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,2'
-BATCH_SIZE = 8
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5'
+BATCH_SIZE = 32
 
 class VAE_GAN(torch.nn.Module):
 	def __init__(self):
@@ -141,9 +141,19 @@ def loss_VAE(fake_img, real_img, mu, logvar, output_fake, output_real, constant_
 
 criterion = nn.BCEWithLogitsLoss()
 
-vae_gan = VAE_GAN().cuda()
-optimizer = torch.optim.Adam(vae_gan.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+model_dir = '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl'
+if os.path.exists(model_dir):
+	vae_gan = torch.load('/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl')
+else:
+	vae_gan = VAE_GAN()
 
+if torch.cuda.device_count() > 1:
+	vae_gan = nn.DataParallel(vae_gan)
+	vae_gan = vae_gan.cuda()
+
+
+# optimizer = torch.optim.Adam(vae_gan.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+optimizer = torch.optim.Adam(vae_gan.parameters())
 if __name__ == '__main__':
 	file_dir = "/home1/yixu/yixu_project/CVAE-GAN/download_script/download"
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -165,7 +175,7 @@ if __name__ == '__main__':
 			nn.init.constant_(m.bias, 0)
 
 
-	fixed_noise = torch.randn( BATCH_SIZE, 64, 1, 1).cuda()  # fix it as one
+	fixed_noise = torch.randn(BATCH_SIZE, 64, 1, 1).cuda()  # fix it as one
 	epoch_num = 4000
 
 	for epoch in range(epoch_num):
@@ -185,7 +195,9 @@ if __name__ == '__main__':
 				  'loss:{:g}'.format(loss))
 
 			if batch_idx == 1:
-				fake_img = vae_gan.Decoder_net(fixed_noise).cuda()
+				fake_img = vae_gan.module.Decoder_net(fixed_noise).cuda()
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output_GAN_VAE/images_epoch{:02d}_batch{:03d}.jpg'.format(
 					epoch, batch_idx)
 				save_image(fake_img, path, normalize=True)
+		if epoch%50 == 0:
+			torch.save(vae_gan.module.state_dict(), '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl')

@@ -14,7 +14,7 @@ import numpy as np
 from torchvision.utils import save_image
 import torch.nn as nn
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "2,3,4,5,6,7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4,5"
 
 np.random.seed(0)  # random seed
 BATCH_SIZE=9

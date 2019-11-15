@@ -20,7 +20,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4,5"
 
 
 class VAE_net(torch.nn.Module):
@@ -97,6 +97,11 @@ class VAE_net(torch.nn.Module):
 		output = self.Decoder_net(add_u_o)  # get
 		return output.cuda(), mu.cuda(), logvar.cuda()
 
+vae = VAE_net()
+
+if torch.cuda.device_count() > 1:
+	vae = nn.DataParallel(vae)
+	vae = vae.cuda()
 
 def loss_func(recon_x, x, mu, logvar):
 	# BCE = F.binary_cross_entropy(recon_x, x, size_average=False)
@@ -107,8 +112,8 @@ def loss_func(recon_x, x, mu, logvar):
 	KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 	return l2_loss + KLD
 
+# Parallel Computing
 
-vae = VAE_net().cuda()
 optimizer = torch.optim.Adam(vae.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
 
 if __name__ == '__main__':
@@ -141,11 +146,11 @@ if __name__ == '__main__':
 
 
 	#
-	vae.Decoder_net.apply(weights_init)
-	vae.Encoder_net.apply(weights_init)
-	vae.Encoder_cal_add_u_o.apply(weights_init)  # ???
-	vae.Encoder_cal_o.apply(weights_init)
-	vae.Encoder_cal_u.apply(weights_init)
+	#vae.Decoder_net.apply(weights_init)
+	#vae.Encoder_net.apply(weights_init)
+	#vae.Encoder_cal_add_u_o.apply(weights_init)  # ???
+	#vae.Encoder_cal_o.apply(weights_init)
+	#vae.Encoder_cal_u.apply(weights_init)
 
 	fixed_noise = torch.randn(64, 64, 1, 1).cuda()  # fix it as one
 	epoch_num = 4000
@@ -164,7 +169,8 @@ if __name__ == '__main__':
 			optimizer.step()
 
 			if batch_idx == 1:
-				fake_img = vae.Decoder_net(fixed_noise).cuda()
+				#fake_img = vae.Decoder_net(fixed_noise).cuda()
+				fake_img = vae.module.Decoder_net(fixed_noise).cuda()
 				# path = '/home1/yixu/yixu_project/CVAE-GAN/output_VAE/images_epoch{:02d}_batch{:03d}.jpg'.format(epoch,batch_idx)
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output_VAE_l2loss/images_epoch{:02d}_batch{:03d}.jpg'.format(
 					epoch, batch_idx)
