@@ -141,19 +141,17 @@ def loss_VAE(fake_img, real_img, mu, logvar, output_fake, output_real, constant_
 
 criterion = nn.BCEWithLogitsLoss()
 
-model_dir = '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl'
-if os.path.exists(model_dir):
-	vae_gan = torch.load('/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl')
-else:
-	vae_gan = VAE_GAN()
-
-if torch.cuda.device_count() > 1:
+vae_gan = VAE_GAN() # instantiate
+model_dir = '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan_save.pkl'
+checkpoint = torch.load(model_dir)
+if torch.cuda.device_count()>1:
 	vae_gan = nn.DataParallel(vae_gan)
 	vae_gan = vae_gan.cuda()
+vae_gan.load_state_dict(checkpoint)
 
 
-# optimizer = torch.optim.Adam(vae_gan.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
-optimizer = torch.optim.Adam(vae_gan.parameters())
+optimizer = torch.optim.Adam(vae_gan.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+# optimizer = torch.optim.Adam(vae_gan.parameters())
 if __name__ == '__main__':
 	file_dir = "/home1/yixu/yixu_project/CVAE-GAN/download_script/download"
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -199,5 +197,6 @@ if __name__ == '__main__':
 				path = '/home1/yixu/yixu_project/CVAE-GAN/output_GAN_VAE/images_epoch{:02d}_batch{:03d}.jpg'.format(
 					epoch, batch_idx)
 				save_image(fake_img, path, normalize=True)
-		if epoch%50 == 0:
-			torch.save(vae_gan.module.state_dict(), '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl')
+		if epoch%1 == 0:
+			torch.save(vae_gan.state_dict(), '/home1/yixu/yixu_project/CVAE-GAN/saved_model/vae_gan.pkl')
+			print("++++++++++++++++++++++++save++++++++++++++++++++++++++++++")
