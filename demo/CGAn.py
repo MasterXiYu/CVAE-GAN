@@ -51,7 +51,7 @@ class generator(nn.Module):
 
 class discriminator(nn.Module):
     # initializers
-    def __init__(self):
+    def __init__(self)
         super(discriminator, self).__init__()
         self.fc1_1 = nn.Linear(784, 1024)
         self.fc1_2 = nn.Linear(10, 1024)
