@@ -24,12 +24,10 @@ BATCH_SIZE = 32
 class VAE_GAN(torch.nn.Module):
 	def __init__(self):
 		super(VAE_GAN, self).__init__()
-
 		N_FEATURE = 128
 		LATENT_SIZE = 64
 		N_CHANNEL = 3
 		LATENT_CODE_NUM = 64
-
 		self.Encoder_net = nn.Sequential(
 			nn.Conv2d(N_CHANNEL, 8 * N_FEATURE, kernel_size=4, stride=2, padding=1, bias=False),
 			nn.BatchNorm2d(8 * N_FEATURE),  # 64*64
